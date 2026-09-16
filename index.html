@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Slideshow</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #fff;
+    }
+
+    /* Selection Screen */
+    #selectScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+      height: 100%;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+    }
+
+    .select-header {
+      text-align: center;
+    }
+
+    .select-header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+      color: #222;
+    }
+
+    .select-header p {
+      font-size: 14px;
+      color: #666;
+    }
+
+    #dropZone {
+      width: 100%;
+      max-width: 500px;
+      aspect-ratio: 1;
+      border: 3px dashed #bbb;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: #fafbfc;
+      color: #666;
+      font-size: 16px;
+    }
+
+    #dropZone:hover {
+      border-color: #888;
+      background: #f0f2f5;
+    }
+
+    #dropZone.drag-over {
+      border-color: #2563eb;
+      background: #dbeafe;
+      color: #2563eb;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    .select-status {
+      text-align: center;
+      font-size: 14px;
+      color: #555;
+      min-height: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .select-status .count {
+      font-weight: 600;
+      font-size: 16px;
+      color: #2563eb;
+    }
+
+    .select-status .clear-link {
+      font-size: 12px;
+      color: #999;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .select-status .clear-link:hover {
+      color: #666;
+    }
+
+    .rows-control {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    .rows-control label {
+      font-size: 14px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    .rows-control input[type="range"] {
+      width: 150px;
+      cursor: pointer;
+    }
+
+    .rows-control .rows-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2563eb;
+      min-width: 30px;
+      text-align: center;
+    }
+
+    #startBtn {
+      padding: 12px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: #2563eb;
+      color: white;
+    }
+
+    #startBtn:hover:not(:disabled) {
+      background: #1d4ed8;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    #startBtn:disabled {
+      background: #d1d5db;
+      cursor: not-allowed;
+      color: #9ca3af;
+    }
+
+    /* Slideshow Screen */
+    #slideshowScreen {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: white;
+      z-index: 1000;
+    }
+
+    #viewport {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+      background: white;
+    }
+
+    #zoomWrapper {
+      width: 100%;
+      height: 100%;
+      transform: scale(1);
+      transform-origin: center;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
+    #gridContainer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 75px 10px;
+      height: 100%;
+      flex-shrink: 0;
+    }
+
+    .track {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-content: center;
+      height: calc((100vh - 150px - (var(--rows) - 1) * 10px) / var(--rows));
+      flex-shrink: 0;
+    }
+
+    .track img {
+      height: 100%;
+      width: auto;
+      object-fit: cover;
+      border-radius: 20px;
+      flex-shrink: 0;
+      display: block;
+      user-select: none;
+      pointer-events: none;
+    }
+
+
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: black;
+      font-size: 18px;
+      z-index: 1001;
+    }
+
+    .loading-overlay.hidden {
+      opacity: 0;
+      transition: opacity 0.6s ease-out;
+      pointer-events: none;
+    }
+
+    .loading-overlay {
+      opacity: 1;
+      transition: opacity 0.6s ease-out;
+    }
+
+    #backBtn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #000;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 1002;
+      transition: all 0.2s ease;
+    }
+
+    #backBtn:hover {
+      background: white;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <!-- Selection Screen -->
+  <div id="selectScreen">
+    <div class="select-header">
+      <h1>Photo Slideshow</h1>
+      <p>Select or drag & drop your photos to begin</p>
+    </div>
+
+    <div
+      id="dropZone"
+      role="button"
+      tabindex="0"
+      aria-label="Drop photos here or click to select"
+    >
+      <div style="text-align: center; pointer-events: none;">
+        <div style="font-size: 48px; margin-bottom: 10px;">📸</div>
+        <div>Drag & drop photos here</div>
+        <div style="font-size: 13px; margin-top: 8px; color: #999;">or click to browse</div>
+      </div>
+    </div>
+
+    <input
+      id="fileInput"
+      type="file"
+      accept="image/*"
+      multiple
+    >
+
+    <div class="select-status">
+      <div id="statusText">No photos selected</div>
+      <div id="clearContainer" style="display: none;">
+        <span class="clear-link" id="clearBtn">Clear selection</span>
+      </div>
+    </div>
+
+    <div class="rows-control">
+      <label for="rowsSlider">Grid rows:</label>
+      <input
+        id="rowsSlider"
+        type="range"
+        min="1"
+        max="5"
+        value="3"
+      >
+      <span class="rows-value" id="rowsValue">3</span>
+    </div>
+
+    <button id="startBtn" disabled>Start Slideshow</button>
+  </div>
+
+  <!-- Slideshow Screen -->
+  <div id="slideshowScreen">
+    <div class="loading-overlay" id="loadingOverlay">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+        <div>Loading images...</div>
+        <div id="progressBarContainer" style="width: 100px; height: 2px; background: #ccc; border-radius: 1px; overflow: hidden;">
+          <div id="progressBar" style="height: 100%; background: black; width: 0%; transition: width 0.2s ease;"></div>
+        </div>
+      </div>
+    </div>
+
+    <button id="backBtn">← Back</button>
+
+    <div id="viewport">
+      <div id="zoomWrapper">
+        <div id="gridContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SPEED_PX_PER_SEC = 80;
+    const ZOOM_INTRO_DURATION = 3000; // 3 seconds in ms
+
+    let selectedFiles = [];
+    let selectedRows = 3;
+
+    // DOM elements
+    const selectScreen = document.getElementById('selectScreen');
+    const slideshowScreen = document.getElementById('slideshowScreen');
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const statusText = document.getElementById('statusText');
+    const clearContainer = document.getElementById('clearContainer');
+    const clearBtn = document.getElementById('clearBtn');
+    const startBtn = document.getElementById('startBtn');
+    const backBtn = document.getElementById('backBtn');
+    const gridContainer = document.getElementById('gridContainer');
+    const zoomWrapper = document.getElementById('zoomWrapper');
+    const viewport = document.getElementById('viewport');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const rowsSlider = document.getElementById('rowsSlider');
+    const rowsValue = document.getElementById('rowsValue');
+    const progressBar = document.getElementById('progressBar');
+
+    // Update selection UI
+    function updateSelectionUI() {
+      if (selectedFiles.length === 0) {
+        statusText.textContent = 'No photos selected';
+        clearContainer.style.display = 'none';
+        startBtn.disabled = true;
+      } else {
+        statusText.innerHTML = `<span class="count">${selectedFiles.length}</span> photo${selectedFiles.length !== 1 ? 's' : ''} selected`;
+        clearContainer.style.display = 'flex';
+        startBtn.disabled = false;
+      }
+    }
+
+    // Rows slider handler
+    rowsSlider.addEventListener('input', (e) => {
+      selectedRows = parseInt(e.target.value);
+      rowsValue.textContent = selectedRows;
+    });
+
+    // Drop zone click handler
+    dropZone.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    // Keyboard support for drop zone
+    dropZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+      selectedFiles = [...selectedFiles, ...files];
+      updateSelectionUI();
+    });
+
+    // Drag & drop
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      selectedFiles = [...selectedFiles, ...files];
+      updateSelectionUI();
+    });
+
+    // Clear selection
+    clearBtn.addEventListener('click', () => {
+      selectedFiles = [];
+      updateSelectionUI();
+    });
+
+    // Start slideshow
+    startBtn.addEventListener('click', async () => {
+      if (selectedFiles.length === 0) return;
+
+      // Hide selection screen, show slideshow screen
+      selectScreen.style.display = 'none';
+      slideshowScreen.style.display = 'block';
+
+      // Set rows CSS variable on grid container
+      gridContainer.style.setProperty('--rows', selectedRows);
+
+      // Start with normal scale (no zoom out)
+      zoomWrapper.style.transition = 'none';
+      zoomWrapper.style.transform = 'scale(1)';
+      gridContainer.style.transform = 'translateX(0)';
+
+      // Show loading overlay (white with black text)
+      loadingOverlay.classList.remove('hidden');
+
+      // Create track divs for each row
+      const tracks = [];
+      for (let i = 0; i < selectedRows; i++) {
+        const track = document.createElement('div');
+        track.className = 'track';
+        gridContainer.appendChild(track);
+        tracks.push(track);
+      }
+
+      // Create and append images in round-robin fashion
+      const imageElements = [];
+      const loadPromises = [];
+      let loadedCount = 0;
+      const totalImages = selectedFiles.length;
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const trackIndex = i % selectedRows; // round-robin distribution
+        const img = document.createElement('img');
+        const url = URL.createObjectURL(file);
+        img.src = url;
+
+        const loadPromise = new Promise((resolve) => {
+          const updateProgress = () => {
+            loadedCount++;
+            const progress = (loadedCount / totalImages) * 100;
+            progressBar.style.width = `${progress}%`;
+            resolve();
+          };
+
+          img.onload = updateProgress;
+          img.onerror = updateProgress;
+        });
+
+        loadPromises.push(loadPromise);
+        imageElements.push(img);
+        tracks[trackIndex].appendChild(img);
+      }
+
+      // Wait for all images to load
+      await Promise.all(loadPromises);
+
+      // Calculate track padding factor based on first image width
+      const firstImg = gridContainer.querySelector('img');
+      if (firstImg) {
+        const imgWidth = firstImg.getBoundingClientRect().width;
+        const paddingFactor = imgWidth / selectedRows;
+
+        // Apply staggered padding to each track
+        const allTracks = gridContainer.querySelectorAll('.track');
+        allTracks.forEach((track, index) => {
+          track.style.paddingLeft = `${index * paddingFactor}px`;
+        });
+      }
+
+      // Animate zoom out to fit at least 20 images horizontally
+      await animateZoomOut();
+
+      // Fade out loading overlay
+      loadingOverlay.classList.add('hidden');
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      // Trigger zoom in + pan animations
+      startAnimations();
+    });
+
+    // Back button
+    backBtn.addEventListener('click', () => {
+      // Revoke all object URLs
+      const imgs = gridContainer.querySelectorAll('img');
+      imgs.forEach(img => {
+        URL.revokeObjectURL(img.src);
+      });
+
+      // Clear grid container
+      gridContainer.innerHTML = '';
+
+      // Reset CSS variable
+      gridContainer.style.removeProperty('--rows');
+
+      // Reset transforms
+      zoomWrapper.style.transform = 'scale(1)';
+      zoomWrapper.style.transition = 'none';
+      gridContainer.style.transform = 'translateX(0)';
+      gridContainer.style.transition = 'none';
+
+      // Return to selection screen
+      slideshowScreen.style.display = 'none';
+      selectScreen.style.display = 'flex';
+    });
+
+    function animateZoomOut() {
+      // Calculate scale to fit at least 20 images horizontally
+      const firstImg = gridContainer.querySelector('img');
+      if (!firstImg) return Promise.resolve();
+
+      const imgWidth = firstImg.getBoundingClientRect().width;
+      const gapWidth = 10; // 10px gap between images
+      const totalWidthFor20 = 20 * imgWidth + 19 * gapWidth;
+      const viewportWidth = viewport.clientWidth;
+      const targetScale = viewportWidth / totalWidthFor20;
+
+      // Animate from scale(1) to target scale (zoom out)
+      zoomWrapper.style.transition = `transform 2s ease-in-out`;
+      zoomWrapper.style.transform = `scale(${targetScale})`;
+
+      return new Promise(resolve => {
+        setTimeout(resolve, 2000);
+      });
+    }
+
+    function startAnimations() {
+      // Calculate scale to fit at least 20 images
+      const firstImg = gridContainer.querySelector('img');
+      const imgWidth = firstImg ? firstImg.getBoundingClientRect().width : 200;
+      const gapWidth = 10;
+      const totalWidthFor20 = 20 * imgWidth + 19 * gapWidth;
+      const viewportWidth = viewport.clientWidth;
+      const zoomOutScale = viewportWidth / totalWidthFor20;
+
+      // Animate from zoom-out scale back to scale(1) - zoom IN
+      zoomWrapper.style.transition = `transform ${ZOOM_INTRO_DURATION}ms ease-in-out`;
+      zoomWrapper.style.transform = 'scale(1)';
+
+      // Start pan animation at the same time as zoom-in
+      startPan();
+    }
+
+    function startPan() {
+      // Calculate the scroll distance
+      const distance = gridContainer.scrollWidth - viewport.clientWidth;
+
+      if (distance <= 0) {
+        // All photos fit on screen, no panning needed
+        return;
+      }
+
+      // Calculate duration based on constant speed
+      const duration = distance / SPEED_PX_PER_SEC; // in seconds
+
+      // Set up pan animation
+      gridContainer.style.transition = `transform ${duration}s linear`;
+      gridContainer.style.transform = `translateX(-${distance}px)`;
+    }
+  </script>
+</body>
+</html>

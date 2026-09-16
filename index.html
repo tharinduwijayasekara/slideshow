@@ -188,9 +188,10 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      padding: 75px 10px;
+      padding: 0 10px;
       height: 100%;
       flex-shrink: 0;
+      justify-content: center;
     }
 
     .track {
@@ -240,26 +241,6 @@
       transition: opacity 0.6s ease-out;
     }
 
-    #backBtn {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: rgba(255, 255, 255, 0.9);
-      color: #000;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 600;
-      z-index: 1002;
-      transition: all 0.2s ease;
-    }
-
-    #backBtn:hover {
-      background: white;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    }
   </style>
 </head>
 <body>
@@ -323,8 +304,6 @@
       </div>
     </div>
 
-    <button id="backBtn">← Back</button>
-
     <div id="viewport">
       <div id="zoomWrapper">
         <div id="gridContainer"></div>
@@ -348,7 +327,6 @@
     const clearContainer = document.getElementById('clearContainer');
     const clearBtn = document.getElementById('clearBtn');
     const startBtn = document.getElementById('startBtn');
-    const backBtn = document.getElementById('backBtn');
     const gridContainer = document.getElementById('gridContainer');
     const zoomWrapper = document.getElementById('zoomWrapper');
     const viewport = document.getElementById('viewport');
@@ -423,6 +401,9 @@
     // Start slideshow
     startBtn.addEventListener('click', async () => {
       if (selectedFiles.length === 0) return;
+
+      // Push new history state for browser back button
+      window.history.pushState({ screen: 'slideshow' }, '', window.location.href);
 
       // Hide selection screen, show slideshow screen
       selectScreen.style.display = 'none';
@@ -505,8 +486,8 @@
       startAnimations();
     });
 
-    // Back button
-    backBtn.addEventListener('click', () => {
+    // Function to return to main screen
+    function returnToMainScreen() {
       // Revoke all object URLs
       const imgs = gridContainer.querySelectorAll('img');
       imgs.forEach(img => {
@@ -528,6 +509,18 @@
       // Return to selection screen
       slideshowScreen.style.display = 'none';
       selectScreen.style.display = 'flex';
+    }
+
+    // Handle browser back button
+    window.addEventListener('popstate', (e) => {
+      if (e.state && e.state.screen === 'slideshow') {
+        // This shouldn't happen with our setup, but handle it just in case
+        return;
+      }
+      // Going back from slideshow
+      if (slideshowScreen.style.display === 'block') {
+        returnToMainScreen();
+      }
     });
 
     function animateZoomOut() {

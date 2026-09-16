@@ -172,6 +172,8 @@
       overflow: hidden;
       position: relative;
       background: white;
+      opacity: 0;
+      transition: opacity 0.6s ease-out;
     }
 
     #zoomWrapper {
@@ -480,6 +482,10 @@
 
       // Fade out loading overlay
       loadingOverlay.classList.add('hidden');
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      // Fade in viewport
+      viewport.style.opacity = '1';
       await new Promise(resolve => setTimeout(resolve, 600));
 
       // Trigger zoom in + pan animations
